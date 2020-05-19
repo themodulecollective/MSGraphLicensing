@@ -27,7 +27,7 @@ $Groups = Get-MgGroup -Select DisplayName, AssignedLicenses, ID, Description | W
 
 #Get a 'Friendly' view of enabled skus and serviceplans for each group
 
-foreach ($g in $Groups)
+$GroupLicenseReportObjects = foreach ($g in $Groups)
 {
   [PSCustomObject]@{
     ID                       = $g.ID
