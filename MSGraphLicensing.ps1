@@ -1,8 +1,7 @@
 # add manifest and require Microsoft.Graph module(s) to be installed
 #Get all Subscribed SKUs
-Import-Module Microsoft.Graph
-
-#user must connect to Microsoft Graph using Connect-Graph
+#Import-Module Microsoft.Graph
+#user must connect to Microsoft Graph using Connect-Graph and have sufficient access rights
 
 #get the Skus and the ServicePlans
 $Skus = Get-MgSubscribedSku
@@ -40,7 +39,7 @@ $GroupLicenseReportObjects = foreach ($g in $Groups)
       {
         $AvailableServicePlans = $SkuToServicePlanHash.$($l.SkuID)
         $EnabledServicePlans = $AvailableServicePlans |
-        Where-Object { $l.DisabledPlans -notcontains $_ }
+          Where-Object { $l.DisabledPlans -notcontains $_ }
         $EnabledServicePlans.foreach( { $ServicePlanHash.$_.ServicePlanName })
       }
     )
