@@ -1,3 +1,9 @@
+
+[cmdletbinding()]
+param(
+  [parameter(Mandatory)]
+  [string]$FilePath
+)
 # add manifest and require Microsoft.Graph module(s) to be installed
 #Get all Subscribed SKUs
 #Import-Module Microsoft.Graph
@@ -26,7 +32,7 @@ $Groups = Get-MgGroup -Select DisplayName, AssignedLicenses, ID, Description | W
 
 #Get a 'Friendly' view of enabled skus and serviceplans for each group
 
-$GroupLicenseReportObjects = foreach ($g in $Groups)
+$RawGroupReportObjects = foreach ($g in $Groups)
 {
   [PSCustomObject]@{
     ID                       = $g.ID
@@ -39,7 +45,7 @@ $GroupLicenseReportObjects = foreach ($g in $Groups)
       {
         $AvailableServicePlans = $SkuToServicePlanHash.$($l.SkuID)
         $EnabledServicePlans = $AvailableServicePlans |
-          Where-Object { $l.DisabledPlans -notcontains $_ }
+        Where-Object { $l.DisabledPlans -notcontains $_ }
         $EnabledServicePlans.foreach( { $ServicePlanHash.$_.ServicePlanName })
       }
     )
@@ -51,3 +57,51 @@ $GroupLicenseReportObjects = foreach ($g in $Groups)
     )
   }
 }
+
+$PropertySet = Get-CSVExportPropertySet -Delimiter "`r`n" -ScalarAttributes ID, DisplayName, Description -MultiValuedAttributes AssignedSkuIDs, AssignedSkuNames, EnabledServicePlanNames, DisabledServicePlanNames
+
+$GroupReportObjects = $RawGroupReportObjects | Select-Object -Property $PropertySet
+
+$GroupReportHashtables = @(
+  foreach ($g in $GroupReportObjects)
+  {
+    $reporthash = [ordered]@{ }
+    foreach ($p in $g.psobject.properties.name)
+    {
+      $reporthash.$p = $g.$p
+    }
+    $reporthash
+  }
+)
+
+#Export the groups report
+$wordDoc = New-WordDocument -FilePath $FilePath
+$null = Add-WordText -Text 'M365 Azure AD Group Licensing Report' -FontSize 20 -FontName 'Helvetica Light' -WordDocument $wordDoc
+$null = Add-WordText -Text '' -FontSize 25 -FontName 'Helvetica Light' -WordDocument $wordDoc
+$null = Add-WordText -Text "$(Get-Date -Format yyyy-MM-dd-HH:mm:ss)" -FontSize 11 -FontName 'Helvetica Light' -WordDocument $wordDoc
+foreach ($h in $GroupReportHashtables)
+{
+  $null = Add-WordTable -WordDocument $wordDoc -DataTable $h -FontSize 9 -FontName 'Helvetica Light' -KeepLinesTogether -AutoFit Window -ColumnWidth 2, 4 -Design LightGridAccent1 -BreakPageBeforeTable
+}
+$null = Save-WordDocument -WordDocument $wordDoc
+
+#create a report for ServicePlans - which groups enable them
+$ServicePlanReportObjects = @(
+  foreach ($p in $ServicePlans)
+  {
+    $ServicePlanReportObject = [pscustomobject]@{
+      ServicePlanName = $p.ServicePlanName
+      EnabledGroups   = @(
+        foreach ($g in $GroupReportObjects)
+        {
+          if ($g.EnabledServicePlanNames -contains $p.ServicePlanName)
+          {
+            $ServicePlanReportObject.EnabledGroups = $g
+          }
+        }
+      )
+    }
+    $ServicePlanReportObject
+  }
+)
+$ServicePlanReportObjects
