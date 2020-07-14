@@ -1,7 +1,7 @@
 
 [cmdletbinding()]
 param(
-  [parameter(Mandatory)]
+  [parameter()]
   [string]$FilePath
 )
 # add manifest and require Microsoft.Graph module(s) to be installed
@@ -28,7 +28,7 @@ $ServicePlanHash = @{ }
 $ServicePlans.foreach( { $ServicePlanHash.$($_.ServicePlanID) = $_ })
 
 #Get the groups that are assigned licenses
-$Groups = Get-MgGroup -Select DisplayName, AssignedLicenses, ID, Description | Where-Object -FilterScript { $_.AssignedLicenses.Count -gt 0 } | Select-Object ID, DisplayName, Description, AssignedLicenses
+$Groups = Get-MgGroup -Select DisplayName, AssignedLicenses, ID, Description -Top 900 | Where-Object -FilterScript { $_.AssignedLicenses.Count -gt 0 } | Select-Object ID, DisplayName, Description, AssignedLicenses
 
 #Get a 'Friendly' view of enabled skus and serviceplans for each group
 
@@ -61,18 +61,7 @@ $RawGroupReportObjects = foreach ($g in $Groups)
 $PropertySet = Get-CSVExportPropertySet -Delimiter "`r`n" -ScalarAttributes ID, DisplayName, Description -MultiValuedAttributes AssignedSkuIDs, AssignedSkuNames, EnabledServicePlanNames, DisabledServicePlanNames
 
 $GroupReportObjects = $RawGroupReportObjects | Select-Object -Property $PropertySet
-
-$GroupReportHashtables = @(
-  foreach ($g in $GroupReportObjects)
-  {
-    $reporthash = [ordered]@{ }
-    foreach ($p in $g.psobject.properties.name)
-    {
-      $reporthash.$p = $g.$p
-    }
-    $reporthash
-  }
-)
+$GroupReportObjects
 
 #create a report for ServicePlans - which groups enable them
 $ServicePlanReportObjects = @(
@@ -93,4 +82,5 @@ $ServicePlanReportObjects = @(
     $ServicePlanReportObject
   }
 )
+
 #$ServicePlanReportObjects
